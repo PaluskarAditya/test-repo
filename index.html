@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>admin - dashboard</title>
+	<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+		integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+		crossorigin="anonymous"></script>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
+</head>
+
+<body class="p-2 flex flex-col gap-2 tracking-tighter">
+	<h1 class="text-3xl font-medium ">admin</h1>
+
+	<!-- Table Section -->
+	<div class="overflow-x-auto p-6 bg-gray-100">
+		<table class="min-w-full table-auto bg-white border-separate border-spacing-0 rounded-lg shadow-md"
+			id="campaignTable">
+			<thead>
+				<tr>
+					<th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-200">ID</th>
+					<th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-200">Name</th>
+					<th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-200">Users</th>
+					<th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-200">Date</th>
+					<th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-200">Type</th>
+					<th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-200">Status</th>
+					<th class="px-6 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-200">Action</th>
+				</tr>
+			</thead>
+			<tbody class="text-sm text-gray-700">
+				<!-- Initial rows can be here or empty -->
+			</tbody>
+		</table>
+	</div>
+
+	<!-- Form Section -->
+	<div class="w-full mx-auto p-6 bg-gray-100 rounded-lg shadow-lg">
+		<form id="campaignForm" class="space-y-6 bg-white p-6 rounded-lg shadow-md">
+			<!-- Name Field -->
+			<div>
+				<label for="name" class="block text-sm font-semibold text-gray-700">Name</label>
+				<input type="text" id="name" name="name"
+					class="mt-2 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+					placeholder="Enter the campaign name" required>
+			</div>
+
+			<!-- Text Field -->
+			<div>
+				<label for="text" class="block text-sm font-semibold text-gray-700">Text</label>
+				<textarea id="text" name="text" rows="4"
+					class="mt-2 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+					placeholder="Enter some text for the campaign" required></textarea>
+			</div>
+
+			<!-- Email body test -->
+			<div>
+				<label for="body-text" class="block text-sm font-semibold text-gray-700">Mail Body</label>
+				<textarea type="text" id="body-text" name="name"
+					class="mt-2 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+					placeholder="Enter the campaign name" required></textarea>
+			</div>
+
+			<!-- Template Body Field -->
+			<div>
+				<label for="template-body" class="block text-sm font-semibold text-gray-700">Template Body</label>
+				<textarea id="template-body" name="template-body" rows="6"
+					class="mt-2 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+					placeholder="Enter the template body" required></textarea>
+			</div>
+
+			<!-- Date & Time Field -->
+			<div>
+				<label for="datetime" class="block text-sm font-semibold text-gray-700">Date & Time</label>
+				<input type="datetime-local" id="datetime" name="datetime"
+					class="mt-2 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+					required>
+			</div>
+
+			<!-- Users Field -->
+			<div>
+				<label for="users" class="block text-sm font-semibold text-gray-700">Users</label>
+				<select id="users" name="users"
+					class="mt-2 block w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+					required>
+					<option value="" disabled selected>Select users</option>
+					<option value="all">All Users</option>
+					<option value="selected">Selected Users</option>
+				</select>
+			</div>
+
+			<!-- Submit Button -->
+			<div class="flex justify-end">
+				<button type="submit"
+					class="px-6 py-2 bg-blue-500 text-white text-sm font-semibold rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">
+					Submit
+				</button>
+			</div>
+		</form>
+	</div>
+
+	<script>
+		const socket = io("http://localhost:9000");
+
+		function flattenData(data) {
+			const rows = [];
+
+			for (const username in data) {
+				for (const campaignId in data[username]) {
+					const { phishing, reason } = data[username][campaignId];
+					rows.push([username, campaignId, phishing, reason]);
+				}
+			}
+
+			return rows;
+		}
+
+
+		function generatePDF(data) {
+			const { jsPDF } = window.jspdf;
+			const doc = new jsPDF();
+
+			// Add a title
+			doc.setFontSize(18);
+			doc.setTextColor("#1E3A8A"); // Dark blue
+			doc.text("Phishing Awareness Report", 14, 20);
+
+			// Flatten the data
+			const tableData = flattenData(data);
+
+			// Generate the table
+			doc.autoTable({
+				startY: 30,
+				head: [['Username', 'Campaign ID', 'Phishing', 'Reason']],
+				body: tableData,
+				theme: 'grid',
+				styles: {
+					fillColor: [224, 242, 254], // Light blue background
+					textColor: [30, 58, 138],  // Dark blue text
+				},
+				headStyles: {
+					fillColor: [30, 58, 138], // Darker blue for headers
+					textColor: [255, 255, 255], // White text
+					fontSize: 12,
+				},
+				alternateRowStyles: {
+					fillColor: [237, 247, 255], // Lighter blue for alternate rows
+				},
+			});
+
+			// Save the PDF
+			doc.save("USER-DATA.pdf");
+		}
+
+		// Handle the incoming file data
+		socket.on("get_data", resp => {
+			console.log(resp);
+			generatePDF(resp);
+		});
+
+		// Handle errors
+		socket.on("file-error", (error) => {
+			console.error("Error receiving file:", error.message);
+		});
+
+		// Handle users received from the server
+		socket.on("users", (users) => {
+			const userSelect = document.getElementById('users');
+
+			// Clear previous options (except the default ones)
+			userSelect.innerHTML = `
+            <option value="" disabled selected>Select users</option>
+            <option value="all">All Users</option>
+        `;
+
+			// Add individual user options
+			for (const username in users) {
+				const option = document.createElement('option');
+				option.value = username; // Set the value to the username
+				option.textContent = username; // Display the username
+				userSelect.appendChild(option);
+			}
+
+			console.log("Updated user list:", users);
+		});
+
+		const campaignForm = document.getElementById('campaignForm');
+		const tableBody = document.querySelector('#campaignTable tbody');
+		let recordId = 1; // Track the ID for each new record
+
+		// Handle form submission
+		campaignForm.onsubmit = (e) => {
+			e.preventDefault(); // Prevent the form from reloading the page
+
+			// Get the form values
+			const name = document.getElementById('name').value;
+			const text = document.getElementById('text').value;
+			const bodyText = document.getElementById('body-text').value;
+			const templateBody = document.getElementById('template-body').value;
+			const datetime = document.getElementById('datetime').value;
+			const users = document.getElementById('users').value;
+
+			// Create a new row in the table
+			const newRow = document.createElement('tr');
+			newRow.classList.add('hover:bg-gray-50');
+
+			// Populate the row with form data
+			newRow.innerHTML = `
+            <td class="px-6 py-4 border-b border-gray-200">${recordId++}</td>
+            <td class="px-6 py-4 border-b border-gray-200">${name}</td>
+            <td class="px-6 py-4 border-b border-gray-200">${users}</td>
+            <td class="px-6 py-4 border-b border-gray-200">${datetime}</td>
+            <td class="px-6 py-4 border-b border-gray-200">Phishing</td>
+            <td class="px-6 py-4 border-b border-gray-200 text-green-600 font-semibold">Active</td>
+            <td class="px-6 py-4 border-b border-gray-200">
+                <button id="download-${recordId}"
+                    class="flex justify-center items-center gap-1 px-4 py-2 bg-blue-500 text-white text-xs font-semibold rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400">download report <img class="w-[20px] h-[15px]" src="download.svg" /></button>
+            </td>
+        `;
+
+			// Append the new row to the table
+			tableBody.appendChild(newRow);
+
+			// Emit the message to the server
+			const message = {
+				id: new Date().getTime() + Math.random().toString(36).substr(2, 9),
+				from: "admin",
+				sub: text,
+				bodyText,
+				template: templateBody,
+				type: "Phishing",
+				to: users,
+				time: datetime
+			};
+
+			users === 'all' ? socket.emit("admin_message", message) : socket.emit("targeted_message", message);
+
+			// Add click listener to the download button
+			document.getElementById(`download-${recordId}`).addEventListener('click', () => {
+				socket.emit('get_data');
+			});
+
+			// Reset the form
+			campaignForm.reset();
+		};
+	</script>
+
+
+</body>
+
+</html>
