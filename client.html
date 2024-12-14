@@ -81,7 +81,10 @@
 			e.preventDefault();
 			const name = document.getElementById('uname').value;
 
+			localStorage.setItem('uname', name);
 			socket.emit("set_uname", name);
+			console.log(localStorage.getItem('uname'));
+			
 
 			document.getElementById('set').id = userId;
 			document.getElementById(userId).style.display = "none"
@@ -152,7 +155,14 @@
 
 				document.getElementById(`send-${mail.id}`).addEventListener('click', () => {
 					// Capture the reason text
-					responses[mail.id].reason = document.getElementById(`reason-${mail.id}`).value;
+					const reason = document.getElementById(`reason-${mail.id}`).value;
+					const phishing = responses[mail.id].phishing;
+
+					// Validate response fields
+					if (!phishing || reason.trim() === "") {
+						alert("Please select phishing status and provide a reason.");
+						return;
+					}
 
 					// Disable buttons and textarea after submission
 					document.getElementById(`phish-${mail.id}`).disabled = true;
@@ -166,19 +176,22 @@
 					const respObj = {
 						name: mail.to, // User's name
 						id: uniqueId,  // Unique identifier for this response
-						data: responses // Response data
+						data: {
+							phishing, // Phishing status
+							reason    // Reason for the response
+						}
 					};
 
-					socket.emit("user_response", respObj);
+					socket.emit("user_response", { campaignId: mail.campId, name: [localStorage.getItem('uname')], id: mail.id, phishing, reason });
 
-					// Hide only the response section for the current email
+					// Update the response area for this email
 					const responseArea = document.getElementById(`response-${mail.id}`);
 					if (responseArea) {
-						responseArea.innerHTML = '<p class="text-md text-green-400">response recorded, Thank You!!!</p>'; // Hide the specific response area
+						responseArea.innerHTML = '<p class="text-md text-green-400">Response recorded, Thank You!!!</p>';
 					}
 
-					// Log the responses to check the data
-					console.log(responses);
+					// Log the response for debugging
+					console.log(respObj);
 				});
 
 			};

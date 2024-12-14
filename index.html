@@ -12,7 +12,7 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 	<style>
-		* > * {
+		*>* {
 			font-family: 'Jetbrains Mono', sans-serif;
 		}
 	</style>
@@ -115,8 +115,15 @@
 
 			for (const username in data) {
 				for (const campaignId in data[username]) {
-					const { phishing, reason } = data[username][campaignId];
-					rows.push([username, campaignId, phishing, reason]);
+					const campaignData = data[username][campaignId];
+					const phishing = campaignData.phishing ? "Yes" : "No"; // Handle phishing status
+					const reason = campaignData.reason || "N/A";          // Handle reason
+					rows.push([
+						username,       // Username
+						campaignId,     // Campaign ID
+						phishing,       // Phishing ('Yes'/'No')
+						reason          // Reason (or 'N/A')
+					]);
 				}
 			}
 
@@ -125,12 +132,6 @@
 
 
 		function generatePDF(data) {
-			const user = document.getElementById('users');
-
-			if (user === 'all') {
-				console.log('unflatten data:', data);
-			} else {}
-			
 			const { jsPDF } = window.jspdf;
 			const doc = new jsPDF();
 
@@ -139,15 +140,14 @@
 			doc.setTextColor("#1E3A8A"); // Dark blue
 			doc.text("Phishing Awareness Report", 14, 20);
 
-			// Flatten the data
+			// Flatten the data for the table
 			const tableData = flattenData(data);
-			console.log('flatten data:', data);
 
 			// Generate the table
 			doc.autoTable({
 				startY: 30,
-				head: [['Username', 'Campaign ID', 'Phishing', 'Reason']],
-				body: tableData,
+				head: [['Username', 'Campaign ID', 'Phishing', 'Reason']], // Table headers
+				body: tableData, // Table body from flattened data
 				theme: 'grid',
 				styles: {
 					fillColor: [224, 242, 254], // Light blue background
@@ -166,6 +166,7 @@
 			// Save the PDF
 			doc.save("USER-DATA.pdf");
 		}
+
 
 		// Handle the incoming file data
 		socket.on("get_data", resp => {
@@ -245,14 +246,15 @@
 				template: templateBody,
 				type: "Phishing",
 				to: users,
-				time: datetime
+				time: datetime,
+				campId: new Date().getTime().toString(36) + Math.random().toString(36).substr(2, 9) + (Math.random() * 1000000).toFixed(0)
 			};
 
 			users === 'all' ? socket.emit("admin_message", message) : socket.emit("targeted_message", message);
 
 			// Add click listener to the download button
 			document.getElementById(`download-${recordId}`).addEventListener('click', () => {
-				socket.emit('get_data', message.to);
+				socket.emit('get_data', message.campId);
 			});
 
 			// Reset the form

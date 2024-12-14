@@ -14,7 +14,7 @@ const io = new Server(server, {
 const PORT = 9000;
 
 let users = {}; // Stores username -> socket.id mapping
-let responses = {}; // Stores responses in the desired format
+let responses = []; // Stores responses in the desired format
 
 io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -24,9 +24,6 @@ io.on("connection", (socket) => {
     socket.on('set_uname', (username) => {
         if (username) {
             users[username] = socket.id; // Map username to socket ID
-            if (!responses[username]) {
-                responses[username] = {}; // Initialize response object for the user
-            }
             io.emit("users", users); // Notify all clients of the updated users list
             console.log('Users:', users);
         }
@@ -45,43 +42,15 @@ io.on("connection", (socket) => {
         }
     });
 
-    // Handle user responses
     socket.on('user_response', (resp) => {
-        const { name, id, data } = resp;
-
-        if (name && id && data) {
-            // Ensure the username exists in the `responses` object
-            if (!responses[name]) {
-                responses[name] = {};
-            }
-
-            // Store the response using the unique ID
-            responses[name][id] = data;
-            console.log("Updated Responses:", responses);
-        } else {
-            console.error("Invalid response structure received:", resp);
-        }
+        responses.push(resp);
+        console.log(responses);
     });
+
 
     // Get data for a specific user or all users
     socket.on('get_data', (param) => {
-        if (param === "all") {
-            if (Object.keys(responses).length > 0) {
-                const allResponses = { all: responses };
-                console.log("Sending all data:", allResponses);
-                socket.emit('get_data', allResponses); // Emit all user data to the requesting socket
-            } else {
-                console.error("No data available for any user.");
-                socket.emit('get_data', { error: "No data available for any user." });
-            }
-        } else if (param && responses[param]) {
-            const userResponses = { [param]: responses[param] };
-            console.log("Sending data for user:", userResponses);
-            socket.emit('get_data', userResponses); // Emit specific user's data to the requesting socket
-        } else {
-            console.error(`No data found for user: ${param}`);
-            socket.emit('get_data', { error: `No data found for user: ${param}` });
-        }
+        const mails = responses.map(el => campId === param);
     });
 
 
