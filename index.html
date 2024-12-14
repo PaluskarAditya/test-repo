@@ -11,10 +11,14 @@
 	<script src="https://cdn.tailwindcss.com"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
+	<style>
+		* > * {
+			font-family: 'Jetbrains Mono', sans-serif;
+		}
+	</style>
 </head>
 
-<body class="p-2 flex flex-col gap-2 tracking-tighter">
+<body class="p-2 flex flex-col gap-2">
 	<h1 class="text-3xl font-medium ">admin</h1>
 
 	<!-- Table Section -->
@@ -121,6 +125,12 @@
 
 
 		function generatePDF(data) {
+			const user = document.getElementById('users');
+
+			if (user === 'all') {
+				console.log('unflatten data:', data);
+			} else {}
+			
 			const { jsPDF } = window.jspdf;
 			const doc = new jsPDF();
 
@@ -131,6 +141,7 @@
 
 			// Flatten the data
 			const tableData = flattenData(data);
+			console.log('flatten data:', data);
 
 			// Generate the table
 			doc.autoTable({
@@ -241,7 +252,7 @@
 
 			// Add click listener to the download button
 			document.getElementById(`download-${recordId}`).addEventListener('click', () => {
-				socket.emit('get_data');
+				socket.emit('get_data', message.to);
 			});
 
 			// Reset the form

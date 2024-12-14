@@ -1,19 +1,20 @@
 const { Server } = require('socket.io');
 const express = require('express');
 const http = require('http');
-const app = express();
 const cors = require('cors');
+
+const app = express();
 const server = http.createServer(app);
-const PORT = 9000;
 const io = new Server(server, {
     cors: {
         origin: "*"
     }
 });
 
-let users = {}; // Stores username -> socket.id mapping
+const PORT = 9000;
 
-let responses = {};
+let users = {}; // Stores username -> socket.id mapping
+let responses = {}; // Stores responses in the desired format
 
 io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
@@ -21,31 +22,68 @@ io.on("connection", (socket) => {
 
     // Assign a username to the connected user
     socket.on('set_uname', (username) => {
-        users[username] = socket.id; // Map username to socket ID
-        io.emit("users", users); // Notify all clients of the updated users list
-        console.log(users);
+        if (username) {
+            users[username] = socket.id; // Map username to socket ID
+            if (!responses[username]) {
+                responses[username] = {}; // Initialize response object for the user
+            }
+            io.emit("users", users); // Notify all clients of the updated users list
+            console.log('Users:', users);
+        }
     });
 
-    // Amin message to all users
-    socket.on('admin_message', msg => {
+    // Admin message to all users
+    socket.on('admin_message', (msg) => {
         io.emit('admin_message', msg);
-    })
+    });
 
-    // Targeted message to specific user or group
-    socket.on('targeted_message', msg => {
-        const user = users[msg.to];
-        socket.to(user).emit('targeted_message', msg);
-    })
+    // Targeted message to a specific user or group
+    socket.on('targeted_message', (msg) => {
+        const userSocketId = users[msg.to];
+        if (userSocketId) {
+            socket.to(userSocketId).emit('targeted_message', msg);
+        }
+    });
 
-    socket.on('user_response', resp => {
-        const user = users[resp.name];
-        responses[resp.name] = resp.data;
-        console.log(responses);
-    })
+    // Handle user responses
+    socket.on('user_response', (resp) => {
+        const { name, id, data } = resp;
 
-    socket.on('get_data', () => {
-        io.emit('get_data', responses);
-    })
+        if (name && id && data) {
+            // Ensure the username exists in the `responses` object
+            if (!responses[name]) {
+                responses[name] = {};
+            }
+
+            // Store the response using the unique ID
+            responses[name][id] = data;
+            console.log("Updated Responses:", responses);
+        } else {
+            console.error("Invalid response structure received:", resp);
+        }
+    });
+
+    // Get data for a specific user or all users
+    socket.on('get_data', (param) => {
+        if (param === "all") {
+            if (Object.keys(responses).length > 0) {
+                const allResponses = { all: responses };
+                console.log("Sending all data:", allResponses);
+                socket.emit('get_data', allResponses); // Emit all user data to the requesting socket
+            } else {
+                console.error("No data available for any user.");
+                socket.emit('get_data', { error: "No data available for any user." });
+            }
+        } else if (param && responses[param]) {
+            const userResponses = { [param]: responses[param] };
+            console.log("Sending data for user:", userResponses);
+            socket.emit('get_data', userResponses); // Emit specific user's data to the requesting socket
+        } else {
+            console.error(`No data found for user: ${param}`);
+            socket.emit('get_data', { error: `No data found for user: ${param}` });
+        }
+    });
+
 
     // Remove user from the list when they disconnect
     socket.on('disconnect', () => {
@@ -58,10 +96,10 @@ io.on("connection", (socket) => {
             }
         }
         io.emit("users", users); // Notify all clients of the updated users list
-        console.log(users);
+        console.log('Users after disconnect:', users);
     });
 });
 
 app.use(cors());
 
-server.listen(PORT, () => console.log('Listening on port 9000'));
+server.listen(PORT, () => console.log(`Listening on port ${PORT}`));
